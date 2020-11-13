@@ -15,12 +15,13 @@
 #define ledpin PD6
 
 //defines all the parameters for the footswitch
-bool isTapTempo = false;
-byte address = 0x00;
-//led colors
-int rgb[] = {0,0,0};
+int address = 0x0;
+uint32_t rgb = 0x0;
+bool isTapTempo = 0;
+float tempo = 120;
+char state = '0'; 
 
-//define lib objects
+//define library objects
 CRGB led[1];
 ArduinoTapTempo tap;
 
@@ -40,14 +41,63 @@ void setAddr(){
   address = digitalRead(b0pin) | (digitalRead(b1pin)<<1) | (digitalRead(b2pin)<<2) | (digitalRead(b3pin)<<3) | (digitalRead(b4pin)<<4) | (digitalRead(b5pin)<<5) | (digitalRead(b6pin)<<6);
 }
 
-void getConfig(){
+void doOnRecieve(int numBytes){
+  byte buffer[] = {0x0,0x0,0x0,0x0,0x0};
+  switch (buffer[0]){
+  case 'c':
+    state = 'c';
+    isTapTempo = buffer[1];
+    rgb = buffer[2];
+    break;
   
+  case 'r':
+    state = 'r';
+    rgb = (buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | (buffer[4]);
+    break;
+
+  case 't':
+    state = 't';
+    break;
+  
+  case 'g':
+    state = 'g';
+    break;
+
+  case 'b':
+    state = 'b';
+    break;
+
+  default:
+    break;
+  }
+}
+
+void doOnRequest(){
+  switch (state){
+  case 't':
+    Wire.write((uint16_t)tempo);
+    break;
+  
+  case 'g':
+    Wire.write(rgb);
+    break;
+
+  case 'b':
+    Wire.write(digitalRead(fswpin));
+    break;
+
+  default:
+    break;
+  }
 }
 
 void setup() {
+  setAddr();
   configurePinStates();
   FastLED.addLeds<NEOPIXEL, ledpin>(led, 1);
   Wire.begin(address);
+  Wire.onReceive(doOnRecieve);
+  Wire.onRequest(doOnRequest);
 }
 
 void loop() {
